@@ -1,0 +1,1040 @@
+---
+title: "Todos los casos"
+author: "José Eduardo de Valle Lara"
+date: '2022-04-24'
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Aportaciones de equipo:
+# Federico Ignacio Pantin Diez: 33.33%
+# Eugenio Andrade Lozano: 33.33%
+# José Eduardo de Valle Lara: 33.33%
+# Julio Avellino Amador Fernández: 0%
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+m = read.csv("muestra_positivos.csv")
+```
+
+```{r}
+# vector con las morbilidades
+morb = c("NEUMONIA", "DIABETES", "EPOC", "ASMA", "HIPERTENSION", "CARDIOVASCULAR", "OBESIDAD", "TABAQUISMO")
+
+# creando un subset del dataset solamente con las columnas deseadas
+desired_cols = c(morb, "INTUBADO")
+
+m_reduced = subset(m)
+
+# en cada iteración se elmininan las filas que son diferentes de 1 y de 2 de la morbidad actual
+
+for (i in desired_cols){
+  m_reduced = subset(m_reduced, m_reduced[, i] == 1 | m_reduced[, i] == 2)
+}
+```
+
+```{r}
+least_age = min(m$EDAD) # edad mínima en el dataset
+
+max_age = max(m$EDAD) # edad máxima en el dataset
+
+n_rows = c()
+n_rows[1] = length(m_reduced$EPOC) # número de filas del dataset reducido
+n_rows[2] = length(m$EPOC) # número de filas del dataset original
+
+n_cols = length(morb) # número de morbidades que se van a analizar
+
+# creando el vector de las muertes y edades, cada fila representa una morbidad y cada elemento es el número de muertes de la edad pos-1
+waves_dead = matrix(0, nrow = n_cols, ncol = max_age + 1) # inicializando la matriz
+
+# es lo mismo que waves_death pero con un intervalo de 10 en 10
+waves_dead_interval = matrix(0, nrow = n_cols, ncol = max_age %/% 30) # inicializando la matriz
+
+cat("La edad mínima regitrada es de", least_age, "años\n\n")
+
+cat("La edad máxima registrada es de", max_age, "años\n\n")
+```
+
+```{r}
+summary(m[morb])
+```
+
+```{r}
+# creando los vectores con los datos de morbidades, muertes, intubaciones entre otros datos
+
+# Las variables del total de vivos, total de intubados y total de muertos son vectores donde el primer elemento corresponde al número de personas del dataset reducido y el segundo elemento corresponde al número de personas del dataset original
+
+n_alive = rep(0, 2) # número de vivos
+
+n_intub = rep(0, 2) # personas que han sido intubadas (incluye vivos y muertos)
+
+n_not_intub = rep(0, 2)
+
+n_dead = rep(0, 2) # número de muertos
+
+morbs_dist = c() # vector con enfermedades que se distribuyen normalmente
+
+dead_2020 = 0 # muertos en el 2020
+
+dead_2021 = 0 # muertos en el 2021
+
+dead_2022 = 0 # muertos en el 2022
+
+dates_2020 = c() # vector que contiene las fechas de ingresos de todo el 2020
+
+dates_2021 = c() # vector que contiene las fechas de ingresos de todo el 2021
+
+dates_2022 = c() # vector que contiene las fechas de ingresos de enero hasta marzo del 2022
+
+dic_2020 = c() # vector que contiene la fechas de ingresos de diciembre del 2020
+
+dic_2021 = c() # vector que contiene las fechas de ingresos del 2021
+
+dates_def_2020 = c() # vector que contiene las fechas de defunciones del 2020
+
+dates_def_2021 = c() # vector que contiene fechas de defunciones del 2021
+
+dates_def_2022 = c() # vector que contiene las fechas del 2022
+
+def_dic_2020 = c() # vector de contiene las fechas de defunciones de diciembre del 2020
+
+def_dic_2021 = c() # vector que contiene las fechas de defunciones de diciembre del 2021
+
+
+# inicializando los vectores en ceros
+
+morb_alive = rep(0, n_cols) # vivos con morbidades
+
+not_morb_alive = rep(0, n_cols) # vivos sin morbidades
+
+morb_intub_alive = rep(0, n_cols) # intubados vivos con morbidades
+
+not_morb_intub_alive = rep(0, n_cols) # intubados vivos sin morbidades
+
+morb_dead = rep(0, n_cols) # muertos con morbidades
+
+not_morb_dead = rep(0, n_cols) # muertos sin morbidades
+
+morb_intub_dead = rep(0, n_cols) # intubados que murieron con morbidades
+
+not_morb_intub_dead = rep(0, n_cols) # intubados que murieron sin morbidades
+```
+
+```{r}
+categories <- unique(m$ASMA)
+categories
+```
+
+```{r}
+categories <- unique(m$INTUBADO)
+categories
+```
+
+Se observa que las columnas de ASMA e INTUBADO contienen diferentes datos NaN, ASMA tiene 98 e INTUBADO tiene 97 y 99, hace falta un proceso de filtrado de los datos
+
+```{r}
+# Llenando los vectores con sus datos correspondientes
+
+# Este bucle es para los datos del dataset reducido
+
+
+for (i in 1:n_rows[1]){ # recorriendo todas las filas del dataset
+  
+  # si el paciente está vivo entonces se incrementará los vectores de la información con vida
+  if (m_reduced[i, "FECHA_DEF"] == "9999-99-99") { 
+    
+    n_alive[1] = n_alive[1] + 1
+    
+    # incrementando el contador de intubados, no puede ir dentro del bucle que recorre las columnas de 
+    # morbidades porque estaría contando varias veces los intubados
+    
+    if (m_reduced[i, "INTUBADO"] == 1){
+      n_intub[1] = n_intub[1] + 1
+    } else {
+      n_not_intub[1] = n_not_intub[1] + 1
+    }
+    
+    for(j in 1:n_cols){ # recorriendo las columnas de morbidades
+      
+      # si el paciente sufre de la morbidad actual se incrementará su respectivo contador
+      if (m_reduced[i, morb[j]] == 1){
+        
+        # revisando si el paciente está intubado o no
+        if (m_reduced[i, "INTUBADO"] == 1){
+          
+          morb_intub_alive[j] = morb_intub_alive[j] + 1 # incrementando intubados vivos con morbidad
+        
+        } else {
+          
+          morb_alive[j] = morb_alive[j] + 1 # incrementando vivos no entubados con morbidad
+          
+        }
+      }
+      
+      else { # cuando el paciente no sufre de la morbidad actual
+        
+        # revisando si está intubado o no
+        if (m_reduced[i, "INTUBADO"] == 1){
+          
+          # incrementando intubados vivos sin morbidad
+          not_morb_intub_alive[j] = not_morb_intub_alive[j] + 1
+          
+        } else {
+            
+          not_morb_alive[j] = not_morb_alive[j] + 1 # incrementando vivos no entubados sin morbidad
+          
+          }
+      }
+    }
+  }
+  
+  else{ # si el paciente está muerto entonces se incrementarán los valores de sus vectores respectivos
+    
+    n_dead[1] = n_dead[1] + 1
+    
+    if (m_reduced[i, "INTUBADO"] == 1){
+      n_intub[1] = n_intub[1] + 1
+    } else {
+      n_not_intub[1] = n_not_intub[1] + 1
+    }
+    
+    for(j in 1:n_cols){ # recorriendo las columnas de morbidades
+      
+      # si el paciente fallecido sufrió de la morbidad actual
+      if (m_reduced[i, morb[j]] == 1){
+        
+        # revisando si estuvo intubado o no
+        if (m_reduced[i, "INTUBADO"] == 1){
+          
+          morb_intub_dead[j] = morb_intub_dead[j] + 1 # incrementando muertos intubados con morbidad
+        
+      } else {
+        
+        morb_dead[j] = morb_dead[j] + 1 # incremendando muertos no intubados con morbidad
+        
+          }
+      }
+      
+      else { # en caso de que el fallecido no haya padecido la morbidad
+        
+        # analizando si fue intubado
+        if (m_reduced[i, "INTUBADO"] == 1){
+          
+          # incrementando intubados muertos sin morbidad
+          not_morb_intub_dead[j] = not_morb_intub_dead[j] + 1
+          
+        } else {
+        
+        not_morb_dead[j] = not_morb_dead[j] + 1 # incrementando muertos no intubados sin morbidad
+        
+        }
+      }
+    }
+  }
+}
+
+```
+
+```{r}
+# Llenando los vectores con sus datos correspondientes
+
+# Este bucle es del dataset original
+
+for (i in 1:n_rows[2]){ # recorriendo todas las filas del dataset
+  
+  # guardando las fechas de ingresos en 2020, 2021 y 2022
+  if (substr(m[i, "FECHA_INGRESO"], 1, 4) == "2020"){
+    dates_2020 = append(dates_2020, m[i, "FECHA_INGRESO"])
+      
+      # guardando solo las fechas de diciembre del 2020
+      if (substr(m[i, "FECHA_INGRESO"], 6, 7) == "12"){
+        dic_2020 = append(dic_2020, m[i, "FECHA_INGRESO"])
+    }
+  } else if (substr(m[i, "FECHA_INGRESO"], 1, 4) == "2021"){
+    dates_2021 = append(dates_2021, m[i, "FECHA_INGRESO"])
+    
+    if (substr(m[i, "FECHA_INGRESO"], 6, 7) == "12"){
+      dic_2021 = append(dic_2021, m[i, "FECHA_INGRESO"])
+    }
+  } else if (substr(m[i, "FECHA_INGRESO"], 1, 4) == "2022"){
+    
+    dates_2022 = append(dates_2022, m[i, "FECHA_INGRESO"])
+    
+  }
+  
+  # guardando fechas de defunciones del 2020, 2021 y 2022
+    if (substr(m[i, "FECHA_DEF"], 1, 4) == "2020"){
+    dates_def_2020 = append(dates_def_2020, m[i, "FECHA_DEF"])
+      
+      # guardando solo las fechas de defunción de diciembre del 2020
+      if (substr(m[i, "FECHA_DEF"], 6, 7) == "12"){
+        def_dic_2020 = append(def_dic_2020, m[i, "FECHA_DEF"])
+    }
+  } else if (substr(m[i, "FECHA_DEF"], 1, 4) == "2021"){
+    dates_def_2021 = append(dates_def_2021, m[i, "FECHA_DEF"])
+    
+    if (substr(m[i, "FECHA_DEF"], 6, 7) == "12"){
+      def_dic_2021 = append(def_dic_2021, m[i, "FECHA_DEF"])
+    }
+  } else if (substr(m[i, "FECHA_DEF"], 1, 4) == "2022"){
+    
+    dates_def_2022 = append(dates_def_2022, m[i, "FECHA_DEF"])
+    
+  }
+  
+  # si el paciente está vivo entonces se incrementará los vectores de la información con vida
+  if (m[i, "FECHA_DEF"] == "9999-99-99") { 
+    
+    n_alive[2] = n_alive[2] + 1
+    
+    # incrementando el contador de intubados, no puede ir dentro del bucle que recorre las columnas de 
+    # morbidades porque estaría contando varias veces los intubados
+    
+    if (m[i, "INTUBADO"] == 1){
+      n_intub[2] = n_intub[2] + 1
+    } else {
+    n_not_intub[2] = n_not_intub[2] + 1
+    }
+  } 
+  
+  else{ # si el paciente está muerto entonces se incrementarán los valores de sus vectores respectivos
+    
+    n_dead[2] = n_dead[2] + 1
+    
+    if (m[i, "INTUBADO"] == 1){
+      n_intub[2] = n_intub[2] + 1
+    } else {
+      n_not_intub[2] = n_not_intub[2] + 1
+    }
+    
+    # aumentando el contador de muertos con sus respectivos años
+    if (substr(m[i, "FECHA_DEF"], 1, 4) == "2020"){
+      
+      dead_2020 = dead_2020 + 1
+      
+    } else if (substr(m[i, "FECHA_DEF"], 1, 4) == "2021"){
+      
+      dead_2021 = dead_2021 + 1
+      
+    } else if (substr(m[i, "FECHA_DEF"], 1, 4) == "2022"){
+      
+      dead_2022 = dead_2022 + 1
+      
+    }
+    
+    for(j in 1:n_cols){ # recorriendo las columnas de morbidades
+      
+      # si el paciente fallecido sufrió de la morbidad actual
+      if (m[i, morb[j]] == 1){
+        
+        # si el paciente está muerto y enfermo de la morbidad entonces se incrementa la matriz de olas 
+        # de muertes de todas las edades
+        waves_dead[j, m[i, "EDAD"]+1] = waves_dead[j, m[i, "EDAD"]+1] + 1
+        
+        # incremetando la matriz de olas de muertes de intervalos de edades
+        waves_dead_interval[j, (m[i, "EDAD"] %/% 30) + 1] = waves_dead_interval[j, (m[i, "EDAD"] %/% 30) + 1] + 1
+        
+      }
+    }
+  }
+}
+```
+
+```{r}
+cat("De la muestra de pacientes positivos se obtuvieron los siguientes datos:\n\n")
+
+cat("Total de vivos: ")
+cat(n_alive[2], "\n\n")
+
+cat("Total de intubados: ")
+cat(n_intub[2], "\n\n")
+
+cat("Total de muertos: ")
+cat(n_dead[2], "\n\n")
+
+cat("Muertos en el 2020: ")
+cat(dead_2020, "\n\n")
+
+cat("Muertos en el 2021: ")
+cat(dead_2021, "\n\n")
+
+cat("Muertos en el 2022: ")
+cat(dead_2022, "\n\n")
+
+cat("Vivos no intubados con morbidad: ")
+cat(morb_alive, "\n\n")
+
+cat("Vivos no intubados sin morbidad: ") 
+cat(not_morb_alive, "\n\n")
+
+cat("Muertos no intubados con morbidad: ")
+cat(morb_dead, "\n\n")
+
+cat("Muertos no intubados sin morbidad: ")
+cat(not_morb_dead, "\n\n")
+
+cat("Vivos intubados con morbidad: ")
+cat(morb_intub_alive, "\n\n")
+
+cat("Vivos intubados sin morbidad: ")
+cat(not_morb_intub_alive, "\n\n")
+
+cat("Muertos intubados con morbidad: ")
+cat(morb_intub_dead, "\n\n")
+
+cat("Muertos intubados sin morbidad: ")
+cat(not_morb_intub_dead, "\n\n")
+```
+
+```{r}
+# Creando los vectores labels, las primeras 8 posiciones son de morbidades y las siguientes 8 posiciones son sin morbidades
+
+labels_dead = rep(0, 16)
+
+labels_intub = rep(0, 16)
+
+# bucle para crear los labels
+
+counter = 1
+
+for (i in morb){
+  
+  labels_dead[counter] = paste("Muertos con", i)
+  labels_intub[counter] = paste("Intubados con", i)
+  
+  counter = counter + 1
+  
+  labels_dead[counter + n_cols - 1] = paste("Muertos sin", i)
+  labels_intub[counter + n_cols - 1] = paste("Intubados sin", i)
+
+  
+}
+
+labels_intub
+
+cat("\n\n")
+
+labels_dead
+
+```
+
+```{r}
+# creando los vectores con probabilidades condicionales, algunas variables no tienen sentido pero se calcularon para corroborar que la suma de P(A|B) + P(A'|B) = 1
+
+# tasa total de intubaciones
+p_intub = n_intub[2] / (n_dead[2] + n_alive[2])
+
+# tasa total de muertes
+p_death = n_dead[2] / (n_dead[2] + n_alive[2])
+
+# proporción de que muera el paciente dado que cuenta con la morbidad = P(muerte and morbidad)/P(morbidad)
+p_morb_dead = (morb_dead + morb_intub_dead) / (morb_dead + morb_intub_dead + morb_alive + morb_intub_alive) 
+
+# proporción de que muera el pacientte dado que no cuenta con la morbidad = P(muerte and morbidad')/P(morbidad')
+p_not_morb_dead = (not_morb_dead + not_morb_intub_dead) / (not_morb_dead + not_morb_intub_dead + not_morb_alive + not_morb_intub_alive) 
+
+# proporción de que el paciente esté vivo dado que cuenta con la morbidad = P(vivo and morbidad)/P(morbidad)
+p_morb_alive = (morb_alive + morb_intub_alive) / (morb_dead + morb_intub_dead + morb_alive + morb_intub_alive)
+
+# proporción de que esté vivo el paciente dado que no cuenta con la morbidad = P(vivo and morbidad')/P(morbidad')
+p_not_morb_alive = (not_morb_alive + not_morb_intub_alive) / (not_morb_dead + not_morb_intub_dead + not_morb_alive + not_morb_intub_alive)
+
+# proporción de que el paciente sea intubado dado que cuenta con la morbidad = P(intubado and morbidad)/P(morbidad)
+p_morb_intub = (morb_intub_alive + morb_intub_dead) / (morb_dead + morb_intub_dead + morb_alive + morb_intub_alive)
+
+# proporción de que el paciente sea intubado dado que no cuenta con la morbidad 
+# = P(intubado and morbidad')/P(morbidad')
+p_not_morb_intub = (not_morb_intub_alive + not_morb_intub_dead) / (not_morb_dead + not_morb_intub_dead + not_morb_alive + not_morb_intub_alive)
+
+# proporción de que el paciente no sea intubado dado que cuenta con la morbilidad 
+# = P(intubado' and morbidad)/P(morbidad)
+p_morb_not_intub = (morb_dead + morb_alive)/(morb_dead + morb_intub_dead + morb_alive + morb_intub_alive)
+
+# proporción de que el paciente no sea intubado dado que no cuenta con la morbilidad 
+# = P(intubado' and morbilidad')/P(morbilidad')
+p_not_morb_not_intub = (not_morb_alive + not_morb_dead) / (not_morb_dead + not_morb_intub_dead + not_morb_alive + not_morb_intub_alive) 
+
+
+n_morb = morb_dead + morb_intub_dead + morb_alive + morb_intub_alive # total de enfermos
+
+n_not_morb = not_morb_dead + not_morb_intub_dead + not_morb_alive + not_morb_intub_alive # total de no enfermos
+
+n_morb_intub = morb_intub_alive + morb_intub_dead + morb_dead + morb_alive # total de intubados por enfermedades
+  
+n_morb_not_intub = not_morb_intub_alive + not_morb_intub_dead + not_morb_alive + not_morb_dead # total de no intubados por enfermedades
+```
+
+```{r}
+par(mfrow=c(2,4))
+
+for (i in 1:n_cols){ # identificador de filas
+  
+  # vec es un vector con los números de cada barra
+  vec = c(p_morb_dead[i], p_not_morb_dead[i])
+  
+  # lbls es un vector con los nombres de cada barra
+  lbls = c(labels_dead[i], labels_dead[i + n_cols])
+  
+  # main es el título de cada gráfica
+  # col es un vector con los colores de cada barra
+  
+  barplot(vec, main = morb[i], names = lbls, col = c("#547d7a", "#694c64"))
+
+  
+}
+
+```
+```{r}
+p_morb_intub
+```
+
+
+```{r}
+par(mfrow=c(2,4))
+
+for (i in 1:n_cols){ # identificador de filas
+  
+  # vec es un vector con los números de cada barra
+  vec = c(p_morb_intub[i], p_not_morb_intub[i])
+  
+  # lbls es un vector con los nombres de cada barra
+  lbls = c(labels_intub[i], labels_intub[i + n_cols])
+  
+  barplot(vec, main = morb[i], names = lbls, col = 5:6)
+}
+```
+
+## Prueba de hipótesis para el intervalo de confianza de la proporción de muertos con morbilidades
+
+1. Calculando el valor frontera
+
+2. Calculando el estadístico de prueba $Z^* = \frac{\bar{p} - P}{\sqrt{\frac{P(1-P)}{n}}}$
+
+3. Calculando p-value
+
+```{r}
+cat("H_0: la proporción de la muestra es igual a la proporción de la población.\n")
+
+cat("H_1: la proporción de la muestra es diferente de la proporción de la población. \n\n")
+
+vf = abs(qnorm(0.05/2))
+cat("El valor frontera del primer extremo es", -vf, "\n\n")
+
+cat("El valor frontera del segundo extremo es", vf, "\n\n")
+
+for (i in 1:n_cols){
+  
+  z_star = (p_morb_dead[i]-0.55)/(sqrt((0.55*(1-0.55))/n_morb[i]))
+  z_star
+
+  p_val = pnorm(z_star)
+  
+  if (p_val > 0.05/2 & p_val < 1-0.05/2){
+    cat("Como p-value (", p_val, ") de", morb[i], "es mayor que 0.025 y menor que 0.975 entonces no se rechaza H_0.\n\n")
+  } else  if (p_val < 0.05){
+    cat("Como p-value (", p_val, ") de", morb[i], "es menor que 0.025 se rechaza H_0.\n\n")
+  } else if (p_val > 0.975){
+    cat("Como p-value(", p_val, ") de", morb[i], "es mayor que 0.975 se rechaza H_0.\n\n")
+  } 
+  
+  
+}
+
+```
+
+
+## Intervalo de confianza de la probabilidad de morir con moriblidades
+
+```{r}
+dead_intervals = rep(0, n_cols*3)
+
+for (i in 1:n_cols){
+  
+  # el número de muertos es el mismo tanto para los que padecieron morbidades como para los que no 
+  # padecieron la morbidad actual
+  
+  # el porcentaje de muertos con morbidad y muertos sin morbidad ya se calculó anteriormente en los 
+  # vectores p_morb_dead y p_not_morb_dead
+  
+  alpha = 0.05
+    
+  z = abs(qnorm(alpha/2))
+    
+  # esta sentencia es para que la diferencia de probabilidades siempre sea positiva y no de lugar a 
+  # confusiones con diferencias negativas
+      
+  d = p_morb_dead[i]
+      
+  # calculando el margen de error
+      
+  s = sqrt(p_morb_dead[i]*(1-p_morb_dead[i])/n_morb[i])
+      
+  me = z*s # margen de error
+      
+  A = d-me # límite inferior
+  B = d+me # límite superior
+      
+      
+  dead_intervals[i*3-2] = labels_dead[i]
+  dead_intervals[i*3-1] = A
+  dead_intervals[i*3] = B
+  
+}
+print(dead_intervals)
+```
+
+
+## Calculando diferencia de proporciones entre muertos con morbilidades y muertos sin morbilidades
+
+Para calcular el intervalo de diferencia de proporciones se usó la siguiente fórmula:
+
+$\bar{p_1}-\bar{p_2} \pm z_{\frac{\alpha}{2}}\sqrt{\frac{\bar{p_1}(1-\bar{p_1})}{n_1}+\frac{\bar{p_2}(1-\bar{p_2}}{n_2}}$
+
+```{r}
+# Calculando la diferencia de proporciones de los muertos con morbidades vs muertos sin morbidades
+
+# dead_intervals es el vector que contiene los datos de los intervalos de confianza de los muertos con 
+# morbidades o muertos sin morbidades, se divide en múltiplos de 3, el primer valor es un string que 
+# nos dice a dónde converge, el segundo valor es el límite inferior y el tercer valor es el límite
+# superior. 
+dif_dead_intervals = rep(0, n_cols*3)
+
+for (i in 1:n_cols){
+  
+  # el número de muertos es el mismo tanto para los que padecieron morbidades como para los que no 
+  # padecieron la morbidad actual
+  
+  # el porcentaje de muertos con morbidad y muertos sin morbidad ya se calculó anteriormente en los 
+  # vectores p_morb_dead y p_not_morb_dead
+  
+  alpha = 0.05
+  
+  z = abs(qnorm(alpha/2))
+  
+  # esta sentencia es para que la diferencia de probabilidades siempre sea positiva y no de lugar a 
+  # confusiones con diferencias negativas
+  if ((p_morb_dead[i] - p_not_morb_dead[i]) >= 0){
+    
+    d = p_morb_dead[i] - p_not_morb_dead[i]
+    
+    # calculando el margen de error
+    
+    s = sqrt(p_morb_dead[i]*(1-p_morb_dead[i])/n_morb[i] + p_not_morb_dead[i]*(1-p_not_morb_dead[i])/n_not_morb[i])
+    
+    me = z*s # margen de error
+    
+    A = d-me # límite inferior
+    B = d+me # límite superior
+    
+    
+    dif_dead_intervals[i*3-2] = labels_dead[i]
+    dif_dead_intervals[i*3-1] = A
+    dif_dead_intervals[i*3] = B
+    
+  } else {
+    
+    d = p_not_morb_dead[i] - p_morb_dead[i]
+    
+    # calculando el margen de error
+    
+    s = sqrt(p_morb_dead[i]*(1-p_morb_dead[i])/n_morb[i] + p_not_morb_dead[i]*(1-p_not_morb_dead[i])/n_not_morb[i])
+    
+    me = z*s # margen de error
+    
+    A = d-me # límite inferior
+    B = d+me # límite superior
+    
+    # si el 0 existe en el intervalo de la verdadera proporción entonces no es un intervalo válido,
+    # entonces dejamos esos datos en 0
+    
+    dif_dead_intervals[i*3-2] = labels_dead[i+n_cols]
+    dif_dead_intervals[i*3-1] = A
+    dif_dead_intervals[i*3] = B
+    
+  }
+  
+}
+print(dif_dead_intervals)
+```
+
+## Calculando la diferencia de proporciones entre muertos con morbilidades y muertos sin morbilidades con la función integrada de R
+
+```{r}
+# vec_x es el vector con las variables de interés 
+# vec_n es el vector con el tamaño de las muestras
+
+# bloque de código de prueba
+
+for (i in 1:n_cols){
+  morbs = morb_dead[i] + morb_intub_dead[i] # cantidad de muertos con morbilidad
+  not_morbs = not_morb_dead[i] + not_morb_intub_dead[i] # cantidad de muertos sin morbilidad
+  vec_x = c(morbs, not_morbs) # vector con p_1 y p_2
+  
+  vec_n = c(n_morb[i], n_not_morb[i]) # vector con n_1 y n_2
+  
+  print(morb[i])
+  print(prop.test(vec_x, vec_n, alternative = "two.sided", conf.level = 0.95, correct = FALSE))
+  cat("\n\n\n")
+}
+```
+
+
+## Prueba de hipótesis para el intervalo de confianza de la proporción de intubados con morbilidades
+
+1. Calculando el valor frontera
+
+2. Calculando el estadístico de prueba $Z^* = \frac{\bar{p} - P}{\sqrt{\frac{P(1-P)}{n}}}$
+
+3. Calculando p-value
+
+```{r}
+cat("H_0: la proporción de la muestra es igual a la proporción de la población.\n")
+
+cat("H_1: la proporción de la muestra es diferente de la proporción de la población. \n\n")
+
+vf = abs(qnorm(0.05/2))
+cat("El valor frontera del primer extremo es", -vf, "\n\n")
+
+cat("El valor frontera del segundo extremo es", vf, "\n\n")
+
+for (i in 1:n_cols){
+  
+  z_star = (p_morb_intub[i]-0.25)/(sqrt((0.25*(1-0.25))/n_morb_intub[i]))
+  z_star
+
+  p_val = pnorm(z_star)
+  
+  if (p_val > 0.05/2 & p_val < 1-0.05/2){
+    cat("Como p-value (", p_val, ") de", morb[i], "es mayor que 0.025 y menor que 0.975 entonces no se rechaza H_0.\n\n")
+  } else  if (p_val < 0.05){
+    cat("Como p-value (", p_val, ") de", morb[i], "es menor que 0.025 se rechaza H_0.\n\n")
+  } else if (p_val > 0.975){
+    cat("Como p-value(", p_val, ") de", morb[i], "es mayor que 0.975 se rechaza H_0.\n\n")
+  } 
+}
+```
+
+## Intervalo de confianza de la probabilidad de ser intubados con morbilidades
+
+```{r}
+intub_intervals = rep(0, n_cols*3)
+
+for (i in 1:n_cols){
+  
+  # el número de intubados es el mismo tanto para los que padecen morbidades como para los que no 
+  # padecen ninguna morbidad
+  
+  # el porcentaje de muertos con morbidad y muertos sin morbidad ya se calculó anteriormente en los 
+  # vectores p_morb_dead y p_not_morb_dead
+  
+    alpha = 0.05
+  
+  z = abs(qnorm(alpha/2))
+  
+  
+  # esta sentencia es para que la diferencia de probabilidades siempre sea positiva y no de lugar a 
+  # confusiones con diferencias negativas
+    
+  d = p_morb_intub[i]
+    
+    # calculando el margen de error
+    
+    s = sqrt(p_morb_intub[i]*(1-p_morb_intub[i])/n_morb_intub[i])
+             
+    
+    me = z*s # margen de error
+    
+    A = d-me # límite inferior
+    B = d+me # límite superior
+    
+    intub_intervals[i*3-2] = labels_intub[i]
+    intub_intervals[i*3-1] = A
+    intub_intervals[i*3] = B
+}
+intub_intervals
+```
+
+## Calculando la diferencia de proporciones entre intubados con morbilidad e intubados sin morbilidad
+
+```{r}
+# Calculando la diferencia de proporciones de los intubados con morbidades vs muertos sin morbidades
+
+# intub_intervals es el vector que contiene los datos de los intervalos de confianza de los intubados con
+# morbidades o intubados sin morbidades, se divide en múltiplos de 3, el primer valor es un string que
+# nos dice a dónde converge, el segundo valor es el límite inferior y el tercer valor es el límite
+# superior.
+dif_intub_intervals = rep(0, n_cols*3)
+
+for (i in 1:n_cols){
+  
+  # el número de intubados es el mismo tanto para los que padecen morbidades como para los que no 
+  # padecen ninguna morbidad
+  
+  # el porcentaje de muertos con morbidad y muertos sin morbidad ya se calculó anteriormente en los 
+  # vectores p_morb_dead y p_not_morb_dead
+  
+  alpha = 0.05
+  
+  z = abs(qnorm(alpha/2))
+  
+  
+  # esta sentencia es para que la diferencia de probabilidades siempre sea positiva y no de lugar a 
+  # confusiones con diferencias negativas
+  if ((p_morb_intub[i] - p_not_morb_intub[i]) >= 0){
+    
+    d = p_morb_intub[i] - p_not_morb_intub[i]
+    
+    # calculando el margen de error
+    
+    s = sqrt(p_morb_intub[i]*(1-p_morb_intub[i])/n_morb_intub[i] + p_not_morb_intub[i]*(1-p_not_morb_intub[i])/n_morb_not_intub[i])
+             
+    
+    me = z*s # margen de error
+    
+    A = d-me # límite inferior
+    B = d+me # límite superior
+    
+    dif_intub_intervals[i*3-2] = labels_intub[i]
+    dif_intub_intervals[i*3-1] = A
+    dif_intub_intervals[i*3] = B
+    
+  } else {
+    
+    d = p_not_morb_intub[i] - p_morb_intub[i]
+    
+    # calculando el margen de error
+    
+    s = sqrt(p_morb_intub[i]*(1-p_morb_intub[i])/n_morb_intub[i] + p_not_morb_intub[i]*(1-p_not_morb_intub[i])/n_morb_not_intub[i])
+    
+    me = z*s # margen de error
+    
+    A = d-me # límite inferior
+    B = d+me # límite superior
+    
+    dif_intub_intervals[i*3-2] = labels_intub[i+n_cols]
+    dif_intub_intervals[i*3-1] = A
+    dif_intub_intervals[i*3] = B
+  }
+}
+
+dif_intub_intervals
+```
+
+```{r}
+# vec_x es el vector con las variables de interés 
+# vec_n es el vector con el tamaño de las muestras
+
+# bloque de código de prueba
+
+for (i in 1:n_cols){
+  intubs = morb_intub_dead[i] + morb_intub_alive[i] # cantidad de intubados con morbilidad
+  not_intubs = not_morb_intub_dead[i] + not_morb_intub_alive[i] # cantidad de intubados sin morbilidad
+  vec_x = c(intubs, not_intubs) # vector con p_1 y p_2
+  
+  vec_n = c(n_morb_intub[i], n_morb_not_intub[i]) # vector con n_1 y n_2
+  
+  print(morb[i])
+  print(prop.test(vec_x, vec_n, alternative = "two.sided", conf.level = 0.95, correct = FALSE))
+  cat("\n\n\n")
+}
+```
+
+```{r}
+# imprimiendo las gráficas de olas
+Ola1 = table(dic_2020)
+plot(Ola1, col = "blue", main = "Ingresos de covid en diciembre del 2020", xlab = "Fecha de ingreso", ylab = "Frecuencia")
+
+Ola2 = table(dic_2021)
+plot(Ola2, col = "red", main = "Ingresos de covid en diciembre del 2021", xlab = "Fecha de ingreso", ylab = "Frecuencia")
+
+mode_dic_2020 = getmode(dic_2020)
+  
+mode_dic_2021 = getmode(dic_2021)
+  
+freq_mode_dic_2020 = sum(dic_2020 == mode_dic_2020)
+  
+freq_mode_dic_2021 = sum(dic_2021 == mode_dic_2021)
+
+cat("De la muestra de contagiados en diciembre del 2020 se registraron", length(dic_2020), "ingresos por covid a la unidad de atención, donde el pico de registros fue el", mode_dic_2020, "con", freq_mode_dic_2020, "casos.\n\n")
+
+cat("De la muestra de contagiados en diciembre del 2021 se registraron", length(dic_2021), "ingresos por covid a la unidad de atención, donde el pico de registros fue el", mode_dic_2021, "con", freq_mode_dic_2021, "casos.\n")
+```
+
+```{r}
+# imprimiendo las gráficas de olas
+Ola3 = table(dates_2020)
+plot(Ola3, col = "blue", main = "Ingresos de covid en 2020", xlab = "Fecha de ingreso", ylab = "Frecuencia")
+
+Ola4 = table(dates_2021)
+plot(Ola4, col = "red", main = "Ingresos de covid en 2021", xlab = "Fecha de ingreso", ylab = "Frecuencia")
+
+mode_2020 = getmode(dates_2020) # obteniendo cuál es la fecha con más repeticiones
+  
+mode_2021 = getmode(dates_2021)
+  
+freq_mode_2020 = sum(dates_2020 == mode_2020) # obteniendo cuántas veces se repite la moda de los datos
+  
+freq_mode_2021 = sum(dates_2021 == mode_2021)
+
+dates_all = append(dates_2020, dates_2021) # combinando las fechas de 2020 y 2021
+
+dates_all = append(dates_all, dates_2022) # combinando las fechas de 2020, 2021 y 2022
+
+mode_all = getmode(dates_all)
+
+freq_mode_all = sum(dates_all == mode_all)
+
+Ola5 = table(dates_all)
+plot(Ola5, col = "purple", main = "Ingresos de covid desde el 2020 hasta el 2022", xlab = "Fecha de ingreso", ylab = "Frecuencia")
+
+cat("De la muestra de contagiados en el 2020 se registraron", length(dates_2020), "ingresos por covid a la unidad de atención, donde el pico de registros fue el", mode_2020, "con", freq_mode_2020, "casos.\n\n")
+
+cat("De la muestra de contagiados en diciembre del 2021 se registraron", length(dates_2021), "ingresos por covid a la unidad de atención, donde el pico de registros fue el", mode_2021, "con", freq_mode_2021, "casos.\n\n")
+
+cat("En la muestra de contagiados desde el 2020 hasta el primer trimestre del 2022 se registraron", length(dates_all), "ingresos por covid a la unidad de atención, donde el pico de registros fue el", mode_all, "con", freq_mode_all, "registros.\n")
+```
+
+No se graficó las olas de contagios y de muertes del 2022 porque solo se cuenta con la información del primer trimestre, sin embargo hay que mencionar que tan solo en el primer trimestre del 2022 ya se superaron los contagios del año 2020 y representa aproximadamente 2/3 de los contagios del 2021, se espera que al final del 2022 el número de contagios exceda por mucho a los registros del 2021.
+
+```{r}
+Ola6 = table(dates_def_2020)
+plot(Ola6, col = "blue", main = "Muertos por covid en 2020", xlab = "Fecha de defunción", ylab = "Frecuencia")
+
+Ola7 = table(dates_def_2021)
+plot(Ola7, col = "red", main = "Muertos por covid en 2021", xlab = "Fecha de defunción", ylab = "Frecuencia")
+
+all_def = append(dates_def_2020, dates_def_2021) # combinando las fechas de defunción del 2020 y 2021
+
+all_def = append(all_def, dates_def_2022) # combinando las fecha de defunción del 2020, 2021 y 2022
+
+Ola8 = table(all_def)
+plot(Ola8, col = "purple", main = "Muertos por covid desde el 2020 hasta el 2022", xlab= "Muertos por covid desde el 2020 hasta el primer trimestre del 2022", ylab = "Frecuencia")
+
+mode_def_2020 = getmode(dates_def_2020)
+  
+mode_def_2021 = getmode(dates_def_2021)
+
+mode_def_all = getmode(all_def)
+  
+freq_mode_def_2020 = sum(dates_def_2020 == mode_def_2020)
+  
+freq_mode_def_2021 = sum(dates_def_2021 == mode_def_2021)
+
+freq_mode_all = sum(all_def == mode_def_all)
+
+cat("En la muestra de contagiados en 2020 se registraron", length(dates_def_2020), "defunciones por covid, donde el pico de muertes fue el", mode_def_2020, "con", freq_mode_def_2020, "registros.\n\n")
+
+cat("En la muestra de contagiados en 2021 se registraron", length(dates_def_2021), "defunciones por covid, donde el pico de muertes fue el", mode_def_2021, "con", freq_mode_def_2021, "registros.\n\n")
+
+cat("En la muestra de contagiados desde el 2020 hasta el primer trimestre del 2022 se registraron", length(all_def), "defunciones por covid, donde el pico de muertes fue el", mode_def_all, "con", freq_mode_all, "registros.\n")
+```
+
+```{r}
+Ola9 = table(def_dic_2020)
+plot(Ola9, col = "blue", main = "Muertos por covid en diciembre del 2020", xlab = "Fecha de defunción", ylab = "Frecuencia")
+
+Ola10 = table(def_dic_2021)
+plot(Ola10, col = "red", main = "Muertos por covid en diciembre del 2021", xlab = "Fecha de defunción", ylab = "Frecuencia")
+
+mode_def_dic_2020 = getmode(def_dic_2020)
+  
+mode_def_dic_2021 = getmode(def_dic_2021)
+  
+freq_mode_def_dic_2020 = sum(def_dic_2020 == mode_def_dic_2020)
+  
+freq_mode_def_dic_2021 = sum(def_dic_2021 == mode_def_dic_2021)
+
+cat("En la muestra de contagiados en diciembre del 2020 se registraron", length(def_dic_2020), "defunciones por covid, donde el pico de muertes fue el", mode_def_dic_2020, "con", freq_mode_def_dic_2020, "registros.\n\n")
+
+cat("En la muestra de contagiados en diciembre 2021 se registraron", length(def_dic_2021), "defunciones por covid, donde el pico de muertes fue el", mode_def_dic_2021, "con", freq_mode_def_dic_2021, "registros.\n")
+```
+
+```{r}
+# imprimiendo las gráficas de muertes con respecto a edades
+
+par(mfrow=c(2,4))
+
+for (i in 1:n_cols){
+  row_vec = unlist(as.list(waves_dead[i, ])) # convirtiendo la fila actual de la matriz a un vector
+  msg1 = paste("Clasificación por edades de muertes por", morb[i], sep = " ")
+  msg2 = paste("Dsitribución de edades desde", least_age, "años hasta", max_age, "años", sep = " ")
+  barplot(row_vec, col = "#5587d9", main = msg1, xlab = msg2, ylab = "Cantidad de muertos")
+  
+  cat(morb[i], ": Se registraron ", sum(waves_dead[i, ])," defunciones con esta morbilidad, su tasa de mortalidad es aproximadamente del ", p_morb_dead[i]*100, "%, donde su pico de muertes está en la edad de ", which.max(waves_dead[i, ])-1," años con ", max(waves_dead[i, ])," registros.\n\n", sep = "")
+}
+```
+
+```{r}
+# imprimiendo las gráficas de muertes con respecto a edades con intervalos de 30 en 30
+
+par(mfrow=c(2,4))
+
+for (i in 1:n_cols){
+  row_vec = unlist(as.list(waves_dead_interval[i, ])) # convirtiendo la fila actual de la matriz a un vector
+  msg1 = paste("Clasificación por edades de muertes por", morb[i], sep = " ")
+  msg2 = paste("Dsitribución de edades desde", least_age, "años hasta", max_age, "años", sep = " ")
+  barplot(row_vec, col = "#5587d9", main = msg1, xlab = msg2, ylab = "Cantidad de muertos")
+  
+  cat(morb[i], ": Se registraron ", sum(waves_dead_interval[i, ])," defunciones con esta morbilidad, su tasa de mortalidad es aproximadamente del ", p_morb_dead[i]*100, "%, donde su pico de muertes está en el intervalo de [", (which.max(waves_dead_interval[i, ]))*30-30,"  ", (which.max(waves_dead_interval[i, ]))*30-1,"] años con ", max(waves_dead_interval[i, ])," registros.\n\n", sep = "")
+ 
+}
+```
+
+## Haciedo la prueba de normalidad
+
+```{r}
+library(nortest)
+for (i in 1:n_cols){
+  p_val = ad.test(waves_dead[i, ])$p.value
+  
+  if (p_val <= 0.05){
+    cat("El p-value de", morb[i], "(", p_val,") es menor que 0.05, por lo tanto no se distribuye normalmente.\n\n")
+    morbs_dist[i] = 0
+  } else {
+    cat("El p-value de", morb[i], "(", p_val, ") es mayor que 0.05, por lo tanto si se distribuye normalmente. \n\n")
+    morbs_dist[i] = 1
+  }
+}
+```
+
+## Tablas bivariadas
+
+```{r}
+alfa = 0.05*2
+col = max_age %/% 10 + 1
+row = 8
+gl = (col - 1) * (row - 1)
+s = qchisq(1 - alfa, gl)
+cat("El valor frontera de la zona de rechazo es:", s)
+```
+Eliminando las columnas que tienen valores menor o igual a 5
+
+```{r}
+waves_dead_interval
+cat("\n\n")
+df = subset(waves_dead_interval, select = -c(1, 4) )
+df
+```
+
+```{r}
+s_star = chisq.test(as.table(df), correct = TRUE)
+cat("El estadístico de prueba es", s_star$statistic)
+```
+
+$H_0$: Las muertes por morbilidades son independientes de la edad.
+$H_1$: Las muertes por morbilidades son dependientes de la edad.
+
+```{r}
+cat("El p-value es", s_star$p.value)
+```
+
+Como p-value es menor que 0.05 entonces se rechaza $H_0$, entonces las muerttes por morbilidades son dependientes de la edad.
